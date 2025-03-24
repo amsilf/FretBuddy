@@ -64,6 +64,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     context.user_data['string_num'] = string_num
     context.user_data['fret_num'] = fret_num
     
+    # Initialize session statistics
+    context.user_data['stats'] = {
+        'correct_answers': 0,
+        'wrong_answers': 0,
+        'total_questions': 0,
+        'questions_with_hints': 0  # Questions where user needed a second attempt
+    }
+    
     # Create keyboard with End Session button
     keyboard = [[InlineKeyboardButton("End Session", callback_data="game_end")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -85,10 +93,18 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     string_num = context.user_data['string_num']
     fret_num = context.user_data['fret_num']
     
+    # Update total questions count on first attempt
+    if context.user_data['attempts'] == 0:
+        context.user_data['stats']['total_questions'] += 1
+    
     if user_answer == correct_note:
         # Create keyboard with End Session button
         keyboard = [[InlineKeyboardButton("End Session", callback_data="game_end")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Update statistics for correct answer
+        if context.user_data['attempts'] == 0:
+            context.user_data['stats']['correct_answers'] += 1
         
         await update.message.reply_text(
             f"🎉 Correct! The note at fret {fret_num} on string {string_num} is {correct_note}.\n\n"
@@ -117,13 +133,19 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         # Wrong answer
         context.user_data['attempts'] += 1
         if context.user_data['attempts'] >= 2:
+            # Update statistics for wrong answer and hint usage
+            context.user_data['stats']['wrong_answers'] += 1
+            context.user_data['stats']['questions_with_hints'] += 1
+            
             await update.message.reply_text(
                 f"The correct answer was {correct_note}. Let's try a new one!"
             )
             
             # Generate new question after two failed attempts
             fretboard_visual, string_num, fret_num, correct_note = fretboard.create_question(
-                context.user_data['max_fret']
+                context.user_data['max_fret'],
+                orientation=context.user_data.get('orientation', 'vertical'),
+                mode=context.user_data.get('mode', 'show')
             )
             
             # Update context with new question
@@ -277,6 +299,30 @@ async def game_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     await query.answer()
     
     if query.data == "game_end":
+        # Get statistics
+        stats = context.user_data.get('stats', {
+            'correct_answers': 0,
+            'wrong_answers': 0,
+            'total_questions': 0,
+            'questions_with_hints': 0
+        })
+        
+        # Calculate accuracy
+        total_questions = stats['total_questions']
+        correct_answers = stats['correct_answers']
+        accuracy = (correct_answers / total_questions * 100) if total_questions > 0 else 0
+        
+        # Create statistics message
+        stats_message = (
+            "📊 Session Statistics:\n\n"
+            f"Total Questions: {total_questions}\n"
+            f"Correct Answers: {correct_answers}\n"
+            f"Wrong Answers: {stats['wrong_answers']}\n"
+            f"Questions with Hints: {stats['questions_with_hints']}\n"
+            f"Accuracy: {accuracy:.1f}%\n\n"
+            "Training session ended. Back to main menu:"
+        )
+        
         # Return to main menu
         keyboard = [
             [InlineKeyboardButton("Start", callback_data="menu_start")],
@@ -286,7 +332,7 @@ async def game_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.message.edit_text(
-            "Training session ended. Back to main menu:",
+            stats_message,
             reply_markup=reply_markup
         )
         return MAIN_MENU

@@ -53,35 +53,38 @@ def create_vertical_fretboard(fretboard: Dict[int, List[str]], max_fret: int, ta
         List of strings representing the fretboard rows
     """
     # Create header with string names
-    header = "       |"
+    header = "     |"
     for string_num in range(6, 0, -1):  # Reverse order for strings
-        string_name = 'e' if string_num == 1 else config.STRINGS[string_num]
-        header += f"  {string_name}   |"
+        string_name = config.STRINGS[string_num]
+        header += f"  {string_name}  |"
     
     # Create separator line
-    separator = "-------+" + "------+" * 6
+    separator = "--+" + "---+" * 6
     
     # Create fret rows
     rows = []
     for fret in range(max_fret + 1):
-        row = f"{fret} |"
+        # Add padding for single-digit fret numbers
+        fret_padding = " " if fret < 10 else ""
+        row = f"{fret}{fret_padding}|"
+        
         for string_num in range(6, 0, -1):  # Reverse order for strings
             note = fretboard[string_num][fret]
             
             # Handle target note
             if fret == target_fret and string_num == target_string:
-                row += f"  {config.QUESTION_MARK}   |"
+                row += f"  {config.QUESTION_MARK}  |"
             # Handle open strings
             elif fret == 0:
-                row += "  ◯   |"
+                row += f"  O  |"
             # Handle hidden notes
             elif mode == 'hide' and (fret != target_fret or string_num != target_string):
-                row += " --- |"
+                row += f" --- |"                
             # Handle regular notes
             else:
                 # Add padding for alignment
                 note_str = note + " " if len(note) == 1 else note
-                row += f"  {note_str} |"
+                row += f" {note_str}  |"
         rows.append(row)
     
     # Combine all parts
