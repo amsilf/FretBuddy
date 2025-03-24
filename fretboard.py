@@ -18,30 +18,80 @@ def create_fretboard(max_fret: int) -> Dict[int, List[str]]:
         fretboard[string_num] = string_notes
     return fretboard
 
-def visualize_string(string_num: int, notes: List[str], target_fret: int = None) -> str:
-    """Visualize a single string with optional target fret marked with '?'."""
+def visualize_string_horizontal(string_num: int, notes: List[str], target_fret: int = None) -> str:
+    """Visualize a single string horizontally with optional target fret marked with '?'."""
     # Use lowercase 'e' for the first string
     string_name = 'e' if string_num == 1 else config.STRINGS[string_num]
     # Start with string name and open string note, marked with circle symbol
-    result = f"{string_name} | ◯ "
+    result = f"{string_name} | ◯ |"
     
     for fret in range(1, len(notes)):
         if fret == target_fret:
             # Add emphasis around the question mark
-            result += f"- {config.QUESTION_MARK} "
+            result += f" {config.QUESTION_MARK} |"
         else:
             # For hidden notes (shown as "---"), don't add extra space
             if notes[fret] == "---":
-                result += f"- {notes[fret]} "
+                result += f" {notes[fret]} |"
             else:
                 # Align other notes, adding extra space for non-sharp notes
                 note = notes[fret] + " " if len(notes[fret]) == 1 else notes[fret]
-                result += f"- {note} "
+                result += f" {note} |"
     return result
+
+def create_vertical_fretboard(fretboard: Dict[int, List[str]], max_fret: int, target_string: int = None, target_fret: int = None, mode: str = 'show') -> List[str]:
+    """Create a vertical representation of the fretboard.
+    
+    Args:
+        fretboard: Dictionary mapping string numbers to list of notes
+        max_fret: Maximum fret number to display
+        target_string: String number where the target note is located
+        target_fret: Fret number where the target note is located
+        mode: Display mode ('show' or 'hide')
+    
+    Returns:
+        List of strings representing the fretboard rows
+    """
+    # Create header with string names
+    header = "       |"
+    for string_num in range(6, 0, -1):  # Reverse order for strings
+        string_name = 'e' if string_num == 1 else config.STRINGS[string_num]
+        header += f"  {string_name}   |"
+    
+    # Create separator line
+    separator = "-------+" + "------+" * 6
+    
+    # Create fret rows
+    rows = []
+    for fret in range(max_fret + 1):
+        row = f"{fret} |"
+        for string_num in range(6, 0, -1):  # Reverse order for strings
+            note = fretboard[string_num][fret]
+            
+            # Handle target note
+            if fret == target_fret and string_num == target_string:
+                row += f"  {config.QUESTION_MARK}   |"
+            # Handle open strings
+            elif fret == 0:
+                row += "  ◯   |"
+            # Handle hidden notes
+            elif mode == 'hide' and (fret != target_fret or string_num != target_string):
+                row += " --- |"
+            # Handle regular notes
+            else:
+                # Add padding for alignment
+                note_str = note + " " if len(note) == 1 else note
+                row += f"  {note_str} |"
+        rows.append(row)
+    
+    # Combine all parts
+    return [header, separator] + rows
 
 def create_question(max_fret: int, orientation: str = 'vertical', mode: str = 'show') -> Tuple[str, int, int, str]:
     """Create a random question for note guessing.
-    Returns: (fretboard_visual, string_number, fret_number, correct_note)
+    
+    Returns:
+        Tuple containing (fretboard_visual, string_number, fret_number, correct_note)
     """
     # Generate complete fretboard
     fretboard = create_fretboard(max_fret)
@@ -53,39 +103,37 @@ def create_question(max_fret: int, orientation: str = 'vertical', mode: str = 's
     # Get correct answer
     correct_note = fretboard[string_num][fret_num]
     
-    # Create visual representation
-    visual = []
-    for string in range(1, 7):
-        string_notes = fretboard[string].copy()  # Make a copy to avoid modifying the original
-        target = fret_num if string == string_num else None
-        
-        # Handle hide mode - replace notes with dashes except for the target
-        if mode == 'hide':
-            for i in range(len(string_notes)):
-                if target is None or i != target:
-                    string_notes[i] = "---"
-                    
-        visual.append(visualize_string(string, string_notes, target))
-    
-    # Add fret numbers at the top
-    fret_numbers = "       "  # Space for string name and open string
-    for fret in range(max_fret + 1):
-        fret_numbers += f"{fret}   "  # Adjust spacing for alignment
-    
     if orientation == 'vertical':
-        visual.insert(0, fret_numbers)  # Insert at the top
+        # Use vertical visualization
+        visual = create_vertical_fretboard(
+            fretboard,
+            max_fret,
+            target_string=string_num,
+            target_fret=fret_num,
+            mode=mode
+        )
+        return ("\n".join(visual), string_num, fret_num, correct_note)
     else:
-        # For horizontal orientation, transpose the fretboard
-        visual = transpose_fretboard(visual, fret_numbers)
-    
-    return ("\n".join(visual), string_num, fret_num, correct_note)
-
-def transpose_fretboard(visual: List[str], fret_numbers: str) -> List[str]:
-    """Transpose the fretboard for horizontal orientation."""
-    transposed = [fret_numbers]
-    for i in range(len(visual[0])):
-        transposed.append(''.join([line[i] for line in visual]))
-    return transposed
+        # Create horizontal visualization
+        visual = []
+        for string in range(1, 7):
+            string_notes = fretboard[string].copy()
+            target = fret_num if string == string_num else None
+            
+            if mode == 'hide':
+                for i in range(len(string_notes)):
+                    if target is None or i != target:
+                        string_notes[i] = "---"
+                        
+            visual.append(visualize_string_horizontal(string, string_notes, target))
+        
+        # Add fret numbers at the top
+        fret_numbers = "        "  # Space for string name and open string
+        for fret in range(max_fret + 1):
+            fret_numbers += f"{fret}     "  # Adjust spacing for alignment with vertical bars
+        
+        visual.insert(0, fret_numbers)
+        return ("\n".join(visual), string_num, fret_num, correct_note)
 
 def format_note_name(note: str) -> str:
     """Format note name to handle both user inputs and internal representation."""

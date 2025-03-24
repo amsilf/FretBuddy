@@ -64,11 +64,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     context.user_data['string_num'] = string_num
     context.user_data['fret_num'] = fret_num
     
+    # Create keyboard with End Session button
+    keyboard = [[InlineKeyboardButton("End Session", callback_data="game_end")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     # Use edit_message_text to update the existing message
     await query.message.edit_text(
         f"Great! Let's practice with {selected_fret} frets.\n"
         "What note is marked with '?' on the fretboard?\n\n"
-        f"```\n{fretboard_visual}\n```"
+        f"```\n{fretboard_visual}\n```",
+        reply_markup=reply_markup
     )
     
     return PLAYING_GAME
@@ -81,7 +86,10 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     fret_num = context.user_data['fret_num']
     
     if user_answer == correct_note:
-        # Correct answer
+        # Create keyboard with End Session button
+        keyboard = [[InlineKeyboardButton("End Session", callback_data="game_end")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
         await update.message.reply_text(
             f"🎉 Correct! The note at fret {fret_num} on string {string_num} is {correct_note}.\n\n"
             "Let's try another one!"
@@ -89,7 +97,9 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         
         # Generate new question
         fretboard_visual, string_num, fret_num, correct_note = fretboard.create_question(
-            context.user_data['max_fret']
+            context.user_data['max_fret'],
+            orientation=context.user_data.get('orientation', 'vertical'),
+            mode=context.user_data.get('mode', 'show')
         )
         
         # Update context with new question
@@ -100,7 +110,8 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         
         await update.message.reply_text(
             "What note is marked with '?' on the fretboard?\n\n"
-            f"```\n{fretboard_visual}\n```"
+            f"```\n{fretboard_visual}\n```",
+            reply_markup=reply_markup
         )
     else:
         # Wrong answer
@@ -260,6 +271,28 @@ async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         await query.message.edit_text("Goodbye! 👋")
         return ConversationHandler.END
 
+async def game_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handle game-related callbacks."""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "game_end":
+        # Return to main menu
+        keyboard = [
+            [InlineKeyboardButton("Start", callback_data="menu_start")],
+            [InlineKeyboardButton("Settings", callback_data="menu_settings")],
+            [InlineKeyboardButton("Quit", callback_data="menu_quit")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.message.edit_text(
+            "Training session ended. Back to main menu:",
+            reply_markup=reply_markup
+        )
+        return MAIN_MENU
+    
+    return PLAYING_GAME
+
 def main() -> None:
     """Start the bot."""
     # Create the Application
@@ -282,7 +315,8 @@ def main() -> None:
                 MessageHandler(
                     filters.TEXT & ~filters.COMMAND,
                     handle_answer
-                )
+                ),
+                CallbackQueryHandler(game_handler, pattern=r"^game_")
             ]
         },
         fallbacks=[
