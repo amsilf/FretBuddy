@@ -40,51 +40,43 @@ def visualize_string_horizontal(string_num: int, notes: List[str], target_fret: 
     return result
 
 def create_vertical_fretboard(fretboard: Dict[int, List[str]], max_fret: int, target_string: int = None, target_fret: int = None, mode: str = 'show') -> List[str]:
-    """Create a vertical representation of the fretboard.
-    
-    Args:
-        fretboard: Dictionary mapping string numbers to list of notes
-        max_fret: Maximum fret number to display
-        target_string: String number where the target note is located
-        target_fret: Fret number where the target note is located
-        mode: Display mode ('show' or 'hide')
-    
-    Returns:
-        List of strings representing the fretboard rows
-    """
-    # Create header with string names
-    header = "     |"
+    """Create a vertical representation of the fretboard."""
+    # Create header with string names - each cell is exactly 5 chars wide
+    header = "    |"  # 4 spaces for fret numbers
     for string_num in range(6, 0, -1):  # Reverse order for strings
-        string_name = config.STRINGS[string_num]
-        header += f"  {string_name}  |"
+        string_name = 'e' if string_num == 1 else config.STRINGS[string_num]
+        # Single character notes get 2 spaces on each side
+        header += f"  {string_name}  |"  # 2 spaces + note + 2 spaces = 5 chars
     
-    # Create separator line
-    separator = "--+" + "---+" * 6
+    # Create separator line matching header exactly
+    separator = "--+" + "---+" * 6  # 4 dashes + 5 dashes per column
     
     # Create fret rows
     rows = []
     for fret in range(max_fret + 1):
-        # Add padding for single-digit fret numbers
+        # Add padding for single-digit fret numbers to maintain 4 char width
         fret_padding = " " if fret < 10 else ""
-        row = f"{fret}{fret_padding}|"
+        row = f"{fret}{fret_padding} |"
         
         for string_num in range(6, 0, -1):  # Reverse order for strings
             note = fretboard[string_num][fret]
             
-            # Handle target note
+            # Handle target note - maintain 5 char width
             if fret == target_fret and string_num == target_string:
                 row += f"  {config.QUESTION_MARK}  |"
-            # Handle open strings
+            # Handle open strings - maintain 5 char width
             elif fret == 0:
-                row += f"  O  |"
-            # Handle hidden notes
+                row += f"  0  |"
+            # Handle hidden notes - maintain 5 char width
             elif mode == 'hide' and (fret != target_fret or string_num != target_string):
-                row += f" --- |"                
-            # Handle regular notes
+                row += f" --- |"
+            # Handle regular notes - maintain 5 char width
             else:
-                # Add padding for alignment
-                note_str = note + " " if len(note) == 1 else note
-                row += f" {note_str}  |"
+                # Adjust padding based on note length (1 or 2 characters)
+                if len(note) == 1:
+                    row += f"  {note}  |"  # 2 spaces on each side for single char
+                else:
+                    row += f" {note} |"   # 1 space before, 2 after for sharp notes
         rows.append(row)
     
     # Combine all parts

@@ -93,15 +93,15 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     string_num = context.user_data['string_num']
     fret_num = context.user_data['fret_num']
     
+    # Create keyboard with End Session button - reused for all responses
+    keyboard = [[InlineKeyboardButton("End Session", callback_data="game_end")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     # Update total questions count on first attempt
     if context.user_data['attempts'] == 0:
         context.user_data['stats']['total_questions'] += 1
     
     if user_answer == correct_note:
-        # Create keyboard with End Session button
-        keyboard = [[InlineKeyboardButton("End Session", callback_data="game_end")]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
         # Update statistics for correct answer
         if context.user_data['attempts'] == 0:
             context.user_data['stats']['correct_answers'] += 1
@@ -156,11 +156,13 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             
             await update.message.reply_text(
                 "What note is marked with '?' on the fretboard?\n\n"
-                f"```\n{fretboard_visual}\n```"
+                f"```\n{fretboard_visual}\n```",
+                reply_markup=reply_markup
             )
         else:
             await update.message.reply_text(
-                "That's not correct. Try again! 🎸"
+                "That's not correct. Try again! 🎸",
+                reply_markup=reply_markup
             )
     
     return PLAYING_GAME
